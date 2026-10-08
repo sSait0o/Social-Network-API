@@ -1,0 +1,326 @@
+@baseUrl = https://localhost:3000
+
+### Inscription organisateur
+# @name register
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "email": "alice@example.com",
+  "password": "Passw0rd!",
+  "firstname": "Alice",
+  "lastname": "Martin"
+}
+
+### Inscription participant
+# @name registerBob
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "email": "bob@example.com",
+  "password": "Passw0rd!",
+  "firstname": "Bob",
+  "lastname": "Durand"
+}
+
+### Connexion organisateur
+# @name login
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "alice@example.com",
+  "password": "Passw0rd!"
+}
+
+### Connexion participant
+# @name loginBob
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "bob@example.com",
+  "password": "Passw0rd!"
+}
+
+###
+@token = {{login.response.body.token}}
+@tokenBob = {{loginBob.response.body.token}}
+@bobId = {{loginBob.response.body.user._id}}
+
+### Sans token (401)
+GET {{baseUrl}}/events
+
+### Créer un groupe public
+# @name createGroup
+POST {{baseUrl}}/group
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "Amis de Lyon",
+  "description": "Sorties entre amis",
+  "type": "public",
+  "allow_member_posts": true,
+  "allow_member_events": false
+}
+
+###
+@groupId = {{createGroup.response.body._id}}
+
+### Bob rejoint le groupe public
+POST {{baseUrl}}/group/{{groupId}}/join
+Authorization: Bearer {{tokenBob}}
+
+### Voir le groupe
+GET {{baseUrl}}/group/{{groupId}}
+Authorization: Bearer {{token}}
+
+### Bob écrit dans le fil du groupe
+POST {{baseUrl}}/group/{{groupId}}/message
+Authorization: Bearer {{tokenBob}}
+Content-Type: application/json
+
+{
+  "content": "Salut tout le monde !"
+}
+
+### Lire le fil du groupe
+GET {{baseUrl}}/group/{{groupId}}/messages
+Authorization: Bearer {{token}}
+
+### Étape 1 + 2 : créer un événement dans le groupe et inviter tous les membres
+# @name createEvent
+POST {{baseUrl}}/event
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "Soirée d'été",
+  "description": "Barbecue au parc",
+  "start_date": "2027-06-21T18:00:00Z",
+  "end_date": "2027-06-22T01:00:00Z",
+  "location": "Parc de la Tête d'Or, Lyon",
+  "cover": "https://example.com/cover.jpg",
+  "visibility": "public",
+  "group": "{{groupId}}",
+  "invite_members": true
+}
+
+###
+@eventId = {{createEvent.response.body._id}}
+
+### Événement invalide (400 : fin avant début)
+POST {{baseUrl}}/event
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "Erreur",
+  "start_date": "2027-06-22T18:00:00Z",
+  "end_date": "2027-06-21T18:00:00Z",
+  "location": "Lyon"
+}
+
+### Étape 3 : activer la billetterie, la liste de courses et le covoiturage
+PATCH {{baseUrl}}/event/{{eventId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "ticketing": true,
+  "shopping_list": true,
+  "carpool": true
+}
+
+### Voir l'événement
+GET {{baseUrl}}/event/{{eventId}}
+Authorization: Bearer {{token}}
+
+### Partager l'événement
+GET {{baseUrl}}/event/{{eventId}}/share
+Authorization: Bearer {{token}}
+
+### Message dans le fil de l'événement
+POST {{baseUrl}}/event/{{eventId}}/message
+Authorization: Bearer {{tokenBob}}
+Content-Type: application/json
+
+{
+  "content": "J'apporte ma guitare"
+}
+
+### Créer un album
+# @name createAlbum
+POST {{baseUrl}}/event/{{eventId}}/album
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "title": "Photos de la soirée"
+}
+
+###
+@albumId = {{createAlbum.response.body._id}}
+
+### Bob poste une photo
+# @name createPhoto
+POST {{baseUrl}}/album/{{albumId}}/photo
+Authorization: Bearer {{tokenBob}}
+Content-Type: application/json
+
+{
+  "url": "https://example.com/photo1.jpg",
+  "description": "Coucher de soleil"
+}
+
+###
+@photoId = {{createPhoto.response.body._id}}
+
+### Commenter la photo
+POST {{baseUrl}}/album/{{albumId}}/photo/{{photoId}}/comment
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "content": "Superbe !"
+}
+
+### Voir l'album (photos peuplées)
+GET {{baseUrl}}/album/{{albumId}}
+Authorization: Bearer {{token}}
+
+### Créer un sondage
+# @name createPoll
+POST {{baseUrl}}/event/{{eventId}}/poll
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "title": "Organisation",
+  "questions": [
+    { "label": "Que mange-t-on ?", "answers": ["Grillades", "Pizza", "Végétarien"] },
+    { "label": "Heure d'arrivée ?", "answers": ["18h", "19h", "20h"] }
+  ]
+}
+
+###
+@pollId = {{createPoll.response.body._id}}
+@questionId = {{createPoll.response.body.questions[0]._id}}
+
+### Bob vote (réponse index 1 = Pizza)
+POST {{baseUrl}}/poll/{{pollId}}/question/{{questionId}}/vote
+Authorization: Bearer {{tokenBob}}
+Content-Type: application/json
+
+{
+  "answer": 1
+}
+
+### Résultats du sondage
+GET {{baseUrl}}/poll/{{pollId}}/results
+Authorization: Bearer {{token}}
+
+### Créer un type de billet
+# @name createTicketType
+POST {{baseUrl}}/event/{{eventId}}/ticket-type
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "Entrée standard",
+  "amount": 12.5,
+  "quantity": 100
+}
+
+###
+@ticketTypeId = {{createTicketType.response.body._id}}
+
+### Types de billets (public, sans token)
+GET {{baseUrl}}/event/{{eventId}}/ticket-types
+
+### Achat d'un billet par une personne extérieure (sans token)
+POST {{baseUrl}}/event/{{eventId}}/ticket
+Content-Type: application/json
+
+{
+  "ticket_type": "{{ticketTypeId}}",
+  "firstname": "Paul",
+  "lastname": "Leroy",
+  "email": "paul.leroy@example.com",
+  "address": {
+    "street": "12 rue de la République",
+    "zip_code": "69002",
+    "city": "Lyon",
+    "country": "France"
+  }
+}
+
+### Deuxième billet pour la même personne (409)
+POST {{baseUrl}}/event/{{eventId}}/ticket
+Content-Type: application/json
+
+{
+  "ticket_type": "{{ticketTypeId}}",
+  "firstname": "Paul",
+  "lastname": "Leroy",
+  "email": "paul.leroy@example.com",
+  "address": {
+    "street": "12 rue de la République",
+    "zip_code": "69002",
+    "city": "Lyon",
+    "country": "France"
+  }
+}
+
+### Billets vendus (organisateur)
+GET {{baseUrl}}/event/{{eventId}}/tickets
+Authorization: Bearer {{token}}
+
+### Liste de courses : Bob apporte des chips
+POST {{baseUrl}}/event/{{eventId}}/shopping-item
+Authorization: Bearer {{tokenBob}}
+Content-Type: application/json
+
+{
+  "name": "Chips",
+  "quantity": 3,
+  "arrival_time": "2027-06-21T18:30:00Z"
+}
+
+### Même article (409)
+POST {{baseUrl}}/event/{{eventId}}/shopping-item
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "chips",
+  "quantity": 1,
+  "arrival_time": "2027-06-21T19:00:00Z"
+}
+
+### Covoiturage proposé par Bob
+POST {{baseUrl}}/event/{{eventId}}/carpool
+Authorization: Bearer {{tokenBob}}
+Content-Type: application/json
+
+{
+  "departure_place": "Gare Part-Dieu",
+  "departure_time": "2027-06-21T17:30:00Z",
+  "price": 3,
+  "seats": 3,
+  "max_delay": 15
+}
+
+### Liste des covoiturages
+GET {{baseUrl}}/event/{{eventId}}/carpools
+Authorization: Bearer {{token}}
+
+### Supprimer l'événement (et tout son contenu)
+DELETE {{baseUrl}}/event/{{eventId}}
+Authorization: Bearer {{token}}
+
+### Supprimer le groupe
+DELETE {{baseUrl}}/group/{{groupId}}
+Authorization: Bearer {{token}}
