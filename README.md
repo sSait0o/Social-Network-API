@@ -1,4 +1,4 @@
-# My Social Networks — API
+# My Social Networks - API
 
 API REST en Node.js, Express et MongoDB pour gérer des événements, des groupes, des discussions, des albums photo, des sondages et une billetterie.
 
